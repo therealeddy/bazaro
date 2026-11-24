@@ -1,0 +1,23 @@
+{
+  "name": "@bazaro/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bazaro/shared": "workspace:*",
+    "express": "5.3.0"
+  },
+  "devDependencies": {
+    "@bazaro/config": "workspace:*",
+    "@types/express": "5.0.6",
+    "@types/node": "catalog:",
+    "tsx": "4.23.15",
+    "typescript": "catalog:"
+  }
+}
