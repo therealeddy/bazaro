@@ -15,8 +15,7 @@ RUN pnpm dlx turbo@2.11.13 prune @bazaro/api --docker
 # 2) Install (cached while the lockfile doesn't change), then build.
 FROM base AS builder
 COPY --from=pruner /repo/out/json/ .
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts
+RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY --from=pruner /repo/out/full/ .
 RUN pnpm turbo run build --filter=@bazaro/api
 # Standalone copy of the api with production dependencies only.
