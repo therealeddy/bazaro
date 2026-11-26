@@ -21,3 +21,6 @@ next-env.d.ts
 
 # study notes (not part of the project)
 planning/
+
+# vercel
+.vercel/

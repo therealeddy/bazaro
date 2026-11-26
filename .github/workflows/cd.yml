@@ -1,0 +1,102 @@
+name: CD
+
+# develop -> dev, main -> production (production waits for a manual approval).
+on:
+  push:
+    branches: [develop, main]
+
+# Never cancel a deploy halfway; queue the next one instead.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'dev' }}
+
+jobs:
+  api:
+    name: api
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'dev' }}
+      url: https://api.${{ vars.DOMAIN }}/health
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # Uploads the repo and Railway builds apps/api/Dockerfile (set on the service).
+      # The project token is scoped to this environment.
+      - name: Deploy to Railway
+        run: npx -y @railway/cli@5.75.0 up --service api --environment "$ENVIRONMENT" --ci
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  web:
+    name: web (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'dev' }}
+      url: https://${{ matrix.subdomain }}${{ vars.DOMAIN }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: landing
+            project: LANDING
+            subdomain: ''
+          - app: dashboard
+            project: DASHBOARD
+            subdomain: 'app.'
+          - app: storefront
+            project: STOREFRONT
+            subdomain: '*.'
+
+    env:
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars[format('VERCEL_PROJECT_ID_{0}', matrix.project)] }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      # Vercel Hobby has only Production and Preview: dev ships as a Preview + alias.
+      VERCEL_TARGET: ${{ github.ref_name == 'main' && 'production' || 'preview' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm (version from package.json "packageManager")
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js (version from .nvmrc)
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@67.0.0
+
+      # Build here in the runner and upload the result (prebuilt).
+      - name: Pull project settings
+        run: vercel pull --yes --environment="$VERCEL_TARGET" --token="$VERCEL_TOKEN"
+
+      - name: Build
+        run: vercel build --environment="$VERCEL_TARGET" --token="$VERCEL_TOKEN"
+
+      - name: Deploy
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --environment="$VERCEL_TARGET" --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      # Production domains are attached to the projects; dev domains are aliases.
+      - name: Point the dev domain to this deployment
+        if: env.ENVIRONMENT == 'dev'
+        run: vercel alias set "$URL" "${{ matrix.subdomain }}${{ vars.DOMAIN }}" --token="$VERCEL_TOKEN" --scope="$VERCEL_ORG_ID"
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
