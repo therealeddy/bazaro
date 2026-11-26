@@ -12,10 +12,13 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "docker:up": "docker compose up -d --wait",
+    "docker:down": "docker compose down",
     "commit": "cz"
   },
   "config": {

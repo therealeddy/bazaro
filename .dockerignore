@@ -1,0 +1,16 @@
+# Keep the build context small and free of local state and secrets.
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.github
+.husky
+.vscode
+planning
+*.log
+**/.vercel
