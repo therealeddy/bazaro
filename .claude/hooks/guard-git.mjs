@@ -9,12 +9,15 @@ const command = JSON.parse(input).tool_input?.command ?? '';
 // Quoted strings stay as one token, so a commit message can't trigger a false positive.
 // Separators (;, &&, ||, |, &, line breaks) are their own tokens even without spaces around.
 const SEPARATOR = /^(?:&&|\|\||[;|&\n])$/;
-const tokens = command.match(/"[^"]*"|'[^']*'|&&|\|\||[;|&\n]|[^\s;|&"']+/g) ?? [];
 
-const segments = [[]];
-for (const token of tokens) {
-  if (SEPARATOR.test(token)) segments.push([]);
-  else segments.at(-1).push(token);
+function splitSegments(text) {
+  const tokens = text.match(/"[^"]*"|'[^']*'|&&|\|\||[;|&\n]|[^\s;|&"']+/g) ?? [];
+  const segments = [[]];
+  for (const token of tokens) {
+    if (SEPARATOR.test(token)) segments.push([]);
+    else segments.at(-1).push(token);
+  }
+  return segments;
 }
 
 const PROTECTED_BRANCHES = ['develop', 'main'];
@@ -39,7 +42,13 @@ function checkGit(subcommand, rest) {
     if (values.some((value) => value.startsWith('+') || value.startsWith(':'))) {
       return 'refspec com + (força) ou : (apaga a branch)';
     }
-    if (values.some((value) => PROTECTED_BRANCHES.includes(value.split(':').at(-1)))) {
+    const targets = values.map((value) =>
+      value
+        .split(':')
+        .at(-1)
+        .replace(/^refs\/heads\//, ''),
+    );
+    if (targets.some((target) => PROTECTED_BRANCHES.includes(target))) {
       return 'push direto pra develop ou main (só mudam por PR)';
     }
   }
@@ -72,12 +81,25 @@ function findProblem(args) {
   return null;
 }
 
-for (const segment of segments) {
-  const problem = findProblem(segment);
-  if (problem) {
-    console.error(
-      `Bloqueado pelo .claude/hooks/guard-git.mjs: ${problem}. Não tente contornar; avise o usuário.`,
-    );
-    process.exit(2);
+// A command passed to a shell (`bash -c "..."`, `sh -c '...'`) is checked too.
+function findProblemIn(text) {
+  for (const segment of splitSegments(text)) {
+    const problem = findProblem(segment);
+    if (problem) return problem;
+    for (let i = 1; i < segment.length; i++) {
+      if (segment[i - 1] === '-c' && /^["']/.test(segment[i])) {
+        const nested = findProblemIn(segment[i].slice(1, -1));
+        if (nested) return nested;
+      }
+    }
   }
+  return null;
+}
+
+const problem = findProblemIn(command);
+if (problem) {
+  console.error(
+    `Bloqueado pelo .claude/hooks/guard-git.mjs: ${problem}. Não tente contornar; avise o usuário.`,
+  );
+  process.exit(2);
 }
