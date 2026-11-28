@@ -3,6 +3,8 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["SENTRY_RELEASE", "NEXT_PUBLIC_SENTRY_*", "VITE_SENTRY_*"],
+      "passThroughEnv": ["SENTRY_AUTH_TOKEN", "CI"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "typecheck": {
