@@ -10,7 +10,7 @@ export function buildInitOptions({ dsn, environment, release }: MonitoringOption
   return {
     dsn,
     enabled: Boolean(dsn),
-    environment: environment ?? 'local',
+    environment: environment || 'local',
     ...(release && { release }),
   };
 }
