@@ -7,7 +7,12 @@ const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
 export const storesRouter = Router();
 
 storesRouter.get('/validate-slug', (req, res) => {
-  const slug = (req.query.slug as string).trim().toLowerCase();
+  if (typeof req.query.slug !== 'string') {
+    res.status(400).json({ error: 'The slug query parameter is required' });
+    return;
+  }
+
+  const slug = req.query.slug.trim().toLowerCase();
 
   const reason = !SLUG_PATTERN.test(slug)
     ? 'invalid-format'
