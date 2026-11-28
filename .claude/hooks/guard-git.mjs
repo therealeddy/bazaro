@@ -7,32 +7,32 @@ for await (const chunk of process.stdin) input += chunk;
 const command = JSON.parse(input).tool_input?.command ?? '';
 
 // Quoted strings stay as one token, so a commit message can't trigger a false positive.
-const tokens = command.match(/"[^"]*"|'[^']*'|\S+/g) ?? [];
+// Separators (;, &&, ||, |, &, line breaks) are their own tokens even without spaces around.
+const SEPARATOR = /^(?:&&|\|\||[;|&\n])$/;
+const tokens = command.match(/"[^"]*"|'[^']*'|&&|\|\||[;|&\n]|[^\s;|&"']+/g) ?? [];
 
 const segments = [[]];
 for (const token of tokens) {
-  if (['&&', '||', ';', '|'].includes(token)) segments.push([]);
+  if (SEPARATOR.test(token)) segments.push([]);
   else segments.at(-1).push(token);
 }
 
 const PROTECTED_BRANCHES = ['develop', 'main'];
 
-function findProblem(args) {
-  const gitIndex = args.indexOf('git');
-  if (gitIndex === -1) return null;
+// Short flags can be grouped: `-fu` is `-f -u`, `-nm` is `-n -m`.
+function hasShortFlag(flags, letter) {
+  return flags.some((flag) => /^-[a-zA-Z]+$/.test(flag) && flag.includes(letter));
+}
 
-  let i = gitIndex + 1;
-  while (args[i]?.startsWith('-')) i += ['-C', '-c'].includes(args[i]) ? 2 : 1;
-  const subcommand = args[i];
-  const rest = args.slice(i + 1);
+function checkGit(subcommand, rest) {
   const flags = rest.filter((arg) => arg.startsWith('-'));
   const values = rest.filter((arg) => !arg.startsWith('-'));
 
   if (subcommand === 'push') {
     if (
-      flags.some(
-        (flag) => flag.startsWith('--force') || ['-f', '--mirror', '--delete', '-d'].includes(flag),
-      )
+      flags.some((flag) => ['--force', '--mirror', '--delete'].some((f) => flag.startsWith(f))) ||
+      hasShortFlag(flags, 'f') ||
+      hasShortFlag(flags, 'd')
     ) {
       return 'push forçado, --mirror ou --delete';
     }
@@ -46,15 +46,29 @@ function findProblem(args) {
 
   if (
     subcommand === 'commit' &&
-    flags.some((flag) => ['--no-verify', '-n', '--amend'].includes(flag))
+    (flags.some((flag) => ['--no-verify', '--amend'].includes(flag)) || hasShortFlag(flags, 'n'))
   ) {
     return 'commit com --no-verify ou --amend';
   }
 
-  if (subcommand === 'add' && flags.some((flag) => ['-f', '--force'].includes(flag))) {
+  if (subcommand === 'add' && (flags.includes('--force') || hasShortFlag(flags, 'f'))) {
     return 'git add forçado (pode incluir arquivos do .gitignore, como o .env)';
   }
 
+  return null;
+}
+
+function findProblem(args) {
+  for (
+    let gitIndex = args.indexOf('git');
+    gitIndex !== -1;
+    gitIndex = args.indexOf('git', gitIndex + 1)
+  ) {
+    let i = gitIndex + 1;
+    while (args[i]?.startsWith('-')) i += ['-C', '-c'].includes(args[i]) ? 2 : 1;
+    const problem = checkGit(args[i], args.slice(i + 1));
+    if (problem) return problem;
+  }
   return null;
 }
 
