@@ -24,3 +24,6 @@ planning/
 
 # vercel
 .vercel/
+
+# claude code personal settings
+.claude/settings.local.json
