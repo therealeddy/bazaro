@@ -1,11 +1,9 @@
 name: CD
 
-# develop -> dev, main -> production (production waits for a manual approval).
 on:
   push:
     branches: [develop, main]
 
-# Never cancel a deploy halfway; queue the next one instead.
 concurrency:
   group: cd-${{ github.ref }}
   cancel-in-progress: false
@@ -29,8 +27,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # Uploads the repo and Railway builds apps/api/Dockerfile (set on the service).
-      # The project token is scoped to this environment.
+      - name: Set Sentry release
+        run: npx -y @railway/cli@5.75.0 variable set "SENTRY_RELEASE=$GITHUB_SHA" --service api --environment "$ENVIRONMENT" --skip-deploys
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
       - name: Deploy to Railway
         run: npx -y @railway/cli@5.75.0 up --service api --environment "$ENVIRONMENT" --ci
         env:
@@ -62,7 +63,6 @@ jobs:
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ vars[format('VERCEL_PROJECT_ID_{0}', matrix.project)] }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      # Vercel Hobby has only Production and Preview: dev ships as a Preview + alias.
       VERCEL_TARGET: ${{ github.ref_name == 'main' && 'production' || 'preview' }}
 
     steps:
@@ -81,12 +81,19 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@67.0.0
 
-      # Build here in the runner and upload the result (prebuilt).
       - name: Pull project settings
         run: vercel pull --yes --environment="$VERCEL_TARGET" --token="$VERCEL_TOKEN"
 
       - name: Build
         run: vercel build --environment="$VERCEL_TARGET" --token="$VERCEL_TOKEN"
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_RELEASE: ${{ github.sha }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars[format('SENTRY_DSN_{0}', matrix.project)] }}
+          NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${{ env.ENVIRONMENT }}
+          VITE_SENTRY_DSN: ${{ vars[format('SENTRY_DSN_{0}', matrix.project)] }}
+          VITE_SENTRY_ENVIRONMENT: ${{ env.ENVIRONMENT }}
+          VITE_SENTRY_RELEASE: ${{ github.sha }}
 
       - name: Deploy
         id: deploy
@@ -94,7 +101,6 @@ jobs:
           url=$(vercel deploy --prebuilt --environment="$VERCEL_TARGET" --token="$VERCEL_TOKEN")
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
-      # Production domains are attached to the projects; dev domains are aliases.
       - name: Point the dev domain to this deployment
         if: env.ENVIRONMENT == 'dev'
         run: vercel alias set "$URL" "${{ matrix.subdomain }}${{ vars.DOMAIN }}" --token="$VERCEL_TOKEN" --scope="$VERCEL_ORG_ID"
