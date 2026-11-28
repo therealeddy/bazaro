@@ -12,12 +12,16 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@bazaro/monitoring": "workspace:*",
     "@bazaro/shared": "workspace:*",
+    "@sentry/react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },
   "devDependencies": {
     "@bazaro/config": "workspace:*",
+    "@sentry/vite-plugin": "catalog:",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "6.3.0",

@@ -10,8 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@bazaro/monitoring": "workspace:*",
     "@bazaro/shared": "workspace:*",
-    "next": "16.4.6",
+    "@sentry/nextjs": "catalog:",
+    "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

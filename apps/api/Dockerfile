@@ -28,4 +28,4 @@ WORKDIR /app
 COPY --from=builder --chown=node:node /prod/api .
 USER node
 EXPOSE 3333
-CMD ["node", "dist/index.js"]
+CMD ["node", "--enable-source-maps", "--import", "./dist/instrument.js", "dist/index.js"]
