@@ -33,7 +33,7 @@
     "@commitlint/cz-commitlint": "21.2.4",
     "commitizen": "4.3.2",
     "eslint": "catalog:",
-    "globals": "17.14.0",
+    "globals": "catalog:",
     "husky": "9.1.7",
     "inquirer": "12.11.1",
     "lint-staged": "17.6.2",

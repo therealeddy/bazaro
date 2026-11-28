@@ -6,7 +6,6 @@ on:
   push:
     branches: [develop, main]
 
-# A new push to the same branch/PR cancels the run that is still going.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -24,7 +23,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          # Full history so Turborepo can compare with the base branch (--affected).
           fetch-depth: 0
 
       - name: Setup pnpm (version from package.json "packageManager")
@@ -45,6 +43,5 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      # Only the packages changed by this PR (and the ones that depend on them).
       - name: Typecheck, test and build
         run: pnpm turbo run typecheck test build --affected
